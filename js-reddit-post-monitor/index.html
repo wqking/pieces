@@ -180,19 +180,26 @@ SubSpider.prototype.render = function(postList)
 	var subName = jQuery('<div class="subName"></div>');
 	this.displayContainer.append(subName);
 
+	var timeText = 'Last update ' + (new Date()).toLocaleTimeString();
 	if(! postList.length) {
-		subName.text(this.urlConfig.name + ' --- Nothing new');
+		subName.text(this.urlConfig.name + ' --- Nothing new. ' + timeText);
 		return;
 	}
 	else {
-		subName.text(this.urlConfig.name);
+		subName.text(this.urlConfig.name + ' ' + timeText);
 	}
 	
 	for(var i = 0; i < postList.length; ++i) {
 		var post = postList[i];
 		var postTitle = jQuery('<div class="postTitle"></div>');
 		this.displayContainer.append(postTitle);
-		postTitle.html('<a href="' + post.url + '" target="_blank">' + post.title + '</a>');
+		postTitle.html('<a href="'
+			+ post.url
+			+ '" target="_blank">'
+			+ post.title
+			+ '</a>'
+			+ ' ' + (new Date(post.created_utc * 1000)).toLocaleTimeString()
+		);
 	}
 }
 

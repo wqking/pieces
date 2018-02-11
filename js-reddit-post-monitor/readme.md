@@ -24,7 +24,3 @@ There are also two buttons,
 - Reload: refresh the page immediately instead of wait for ```refreshInterval``` seconds.
 - Mark read: mark all posts read. Otherwise, the posts will be always on the pages.
 
-## What to improve
-
-This tool is so simple with so little functions so there is not much room to improve.  
-But the CSS is ugly, we may improve the CSS styles, though I myself only needs the result links rather than visual effect.
