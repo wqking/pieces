@@ -1,0 +1,276 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+
+<meta http-equiv="X-UA-Compatible" content="IE=9" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+
+<style type="text/css">
+body
+{
+	margin: 0;
+	padding: 0;
+	padding-top: 30px;
+	font-size: 100%;
+	font-family: Helvetica, Arial;
+	color: #000000;
+	background-color: #ffffff;
+	line-height: 150%;
+}
+
+.container {
+	width: 1100px;
+	max-width: 100%;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.buttonDiv {
+	margin-bottom: 30px;
+}
+
+.button {
+	margin-left: 10px;
+}
+
+.subDiv {
+	margin-bottom: 30px;
+}
+
+.subName {
+	font-size: 120%;
+	font-weight: bold;
+}
+
+.postTitle {
+}
+
+</style>
+
+<title></title>
+<meta name="description" content="" />
+
+<script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.12.0.min.js"></script>
+
+<script type="text/javascript">
+
+(function(ns) {
+'use strict';
+
+var config = {
+	refreshInterval: 60 * 5 * 0 + 5, //seconds
+	firstSeenPostsCount: 3,
+
+	urlList: [
+		// a simple URL is enough
+		'/r/AskReddit/new/.json',
+		// or we can make it object with url and name
+		{
+			url: '/r/funny/new/.json',
+			name: "It's funny!",
+		},
+
+		{
+			url: '/r/forhire/new/.json',
+			name: 'For hire',
+		},
+		{
+			url: '/r/Jobs4Bitcoins/new/.json',
+			name: 'Jobs4Bitcoins',
+		},
+	],
+};
+
+var spiderList = [];
+
+function SubSpider(urlConfig, displayContainer)
+{
+	if(typeof(urlConfig) === "string") {
+		this.urlConfig = {
+			url: urlConfig,
+			name: urlConfig
+		};
+	}
+	else {
+		this.urlConfig = urlConfig;
+	}
+	
+	this.displayContainer = displayContainer;
+	this.loading = false;
+	
+	this.latestPostTime = 0;
+	this.postsToDisplay = [];
+}
+
+SubSpider.prototype.load = function()
+{
+	if(this.loading) {
+		return;
+	}
+
+	var url = this.urlConfig.url;
+	if(! url) {
+		return;
+	}
+	if(url.indexOf('//') < 0) {
+		if(url[0] !== '/') {
+			url = '/' + url;
+		}
+		url = 'https://www.reddit.com' + url;
+	}
+
+	this.loading = true;
+	var self = this;
+	jQuery.ajax({
+		'url': url,
+		'type': 'GET',
+		'success': function(responseData) {
+			self.loading = false;
+			self.processData(responseData);
+		},
+		'error': function(jqXHR, textStatus, errorThrown) {
+			self.loading = false;
+		}
+	});
+}
+
+SubSpider.prototype.processData = function(data)
+{
+	if(! data.data || ! data.data.children) {
+		return;
+	}
+	
+	this.postsToDisplay = [];
+	
+	var postList = data.data.children;
+	for(var i = 0; i < postList.length; ++i) {
+		var post = postList[i].data;
+		if(! post) {
+			continue;
+		}
+		
+		if(this.latestPostTime <= 0) {
+			if(this.postsToDisplay.length < config.firstSeenPostsCount) {
+				this.postsToDisplay.push(post);
+			}
+			else {
+				for(var k = 0; k < this.postsToDisplay.length; ++k) {
+					if(this.postsToDisplay[k].created_utc < post.created_utc) {
+						this.postsToDisplay[k] = post;
+						break;
+					}
+				}
+			}
+		}
+		else {
+			if(this.latestPostTime < post.created_utc) {
+				this.postsToDisplay.push(post);
+			}
+		}
+	}
+	
+	this.postsToDisplay.sort(function(a, b) {
+		return b.created_utc - a.created_utc;
+	});
+	
+	if(this.latestPostTime <= 0 && this.postsToDisplay.length > 0) {
+		this.latestPostTime = this.postsToDisplay[0].created_utc;
+	}
+	
+	this.render(this.postsToDisplay);
+}
+
+SubSpider.prototype.render = function(postList)
+{
+	this.displayContainer.empty();
+	var subName = jQuery('<div class="subName"></div>');
+	this.displayContainer.append(subName);
+
+	if(! postList.length) {
+		subName.text(this.urlConfig.name + ' --- Nothing new');
+		return;
+	}
+	else {
+		subName.text(this.urlConfig.name);
+	}
+	
+	for(var i = 0; i < postList.length; ++i) {
+		var post = postList[i];
+		var postTitle = jQuery('<div class="postTitle"></div>');
+		this.displayContainer.append(postTitle);
+		postTitle.html('<a href="' + post.url + '" target="_blank">' + post.title + '</a>');
+	}
+}
+
+SubSpider.prototype.markRead = function(data)
+{
+	if(this.postsToDisplay.length > 0) {
+		this.latestPostTime = this.postsToDisplay[0].created_utc;
+	}
+	
+	this.postsToDisplay = [];
+	
+	this.render(this.postsToDisplay);
+}
+
+function run()
+{
+	var container = jQuery('#content');
+	for(var i = 0; i < config.urlList.length; ++i) {
+		if(! config.urlList[i]) {
+			continue;
+		}
+
+		var divId = 'sub' + i;
+		var div = jQuery('<div id="' + divId + '" class="subDiv"></div>');
+		container.append(div);
+		var spider = (new SubSpider(config.urlList[i], div));
+		spiderList.push(spider);
+	}
+	
+	ns.reload();
+	
+	if(config.refreshInterval > 0) {
+		setInterval(ns.reload, config.refreshInterval * 1000);
+	}
+}
+
+ns.reload = function()
+{
+	for(var i = 0; i < spiderList.length; ++i) {
+		spiderList[i].load();
+	}
+}
+
+ns.markRead = function()
+{
+	for(var i = 0; i < spiderList.length; ++i) {
+		spiderList[i].markRead();
+	}
+}
+
+jQuery().ready(run);
+
+}(window.rnm = window.rnm || {}));
+
+</script>
+
+</head>
+<body>
+
+<div class="container">
+
+<div class="buttonDiv">
+<button class="button" onclick="window.rnm.reload();">Reload</button>
+<button class="button" onclick="window.rnm.markRead();">Mark read</button>
+</div>
+
+<div id="content">
+</div>
+
+</div>
+
+</body>
+</html>
