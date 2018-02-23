@@ -60,12 +60,14 @@ body
 'use strict';
 
 var config = {
-	refreshInterval: 60 * 5, //seconds
+	refreshInterval: 60 * 1, //seconds
 	firstSeenPostsCount: 3,
 
 	urlList: [
+
 		// a simple URL is enough
 		'/r/AskReddit/new/.json',
+
 		// or we can make it object with url and name
 		{
 			url: '/r/funny/new/.json',
@@ -75,9 +77,35 @@ var config = {
 	],
 };
 
+var cookieLastUpdateTime = "rmc_lastUpdate";
+
+function setCookie(key, value, expireTime)
+{
+	expireTime = expireTime || 0;
+	if(expireTime <= 0) {
+		expireTime = 100 * 365 * 24 * 60 * 60;
+	}
+	var d = new Date();
+	d.setTime(d.getTime() + (expireTime * 1000));
+	var expires = "expires=" + d.toUTCString();
+	document.cookie = key + "=" + encodeURIComponent(value) + "; " + expires;
+}
+
+function getCookie(key, defaultValue)
+{
+	var name = key + "=";
+	var ca = document.cookie.split(';');
+	for(var i=0; i<ca.length; i++) {
+		var c = ca[i];
+		while (c.charAt(0)==' ') c = c.substring(1);
+		if (c.indexOf(name) == 0) return decodeURIComponent(c.substring(name.length,c.length));
+	}
+	return defaultValue;
+}
+
 var spiderList = [];
 
-function SubSpider(urlConfig, displayContainer)
+function SubSpider(urlConfig, displayContainer, lastUpdateTime)
 {
 	if(typeof(urlConfig) === "string") {
 		this.urlConfig = {
@@ -92,7 +120,7 @@ function SubSpider(urlConfig, displayContainer)
 	this.displayContainer = displayContainer;
 	this.loading = false;
 	
-	this.latestPostTime = 0;
+	this.latestPostTime = lastUpdateTime || 0;
 	this.postsToDisplay = [];
 }
 
@@ -212,10 +240,13 @@ SubSpider.prototype.markRead = function(data)
 	this.postsToDisplay = [];
 	
 	this.render(this.postsToDisplay);
+	
+	return this.latestPostTime;
 }
 
 function run()
 {
+	var lastUpdateTime = parseInt(getCookie(cookieLastUpdateTime, "0"));
 	var container = jQuery('#content');
 	for(var i = 0; i < config.urlList.length; ++i) {
 		if(! config.urlList[i]) {
@@ -225,7 +256,7 @@ function run()
 		var divId = 'sub' + i;
 		var div = jQuery('<div id="' + divId + '" class="subDiv"></div>');
 		container.append(div);
-		var spider = (new SubSpider(config.urlList[i], div));
+		var spider = (new SubSpider(config.urlList[i], div, lastUpdateTime));
 		spiderList.push(spider);
 	}
 	
@@ -245,9 +276,12 @@ ns.reload = function()
 
 ns.markRead = function()
 {
+	var time = 0;
 	for(var i = 0; i < spiderList.length; ++i) {
-		spiderList[i].markRead();
+		time = Math.max(time, spiderList[i].markRead());
 	}
+
+	setCookie(cookieLastUpdateTime, "" + time);
 }
 
 jQuery().ready(run);
