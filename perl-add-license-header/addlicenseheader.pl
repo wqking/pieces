@@ -72,8 +72,9 @@ sub processFile
 	close FH;
 	
 	my $beforeMainCode = 1;
+	
+	my $outText = '';
 
-	open FH, '>' . $fileName or die "Can't write $fileName.\n";
 	foreach my $line (@sourceLines) {
 		if($beforeMainCode) {
 			if($line =~ m!^\s*//!) {
@@ -81,14 +82,19 @@ sub processFile
 			elsif($line =~ m!^\s*$!) {
 			}
 			else {
-				print FH $license;
-				print FH "\n";
+				$outText .= $license;
+				$outText .=  "\n";
 				$beforeMainCode = 0;
 			}
 		}
 		if(! $beforeMainCode) {
-			print FH $line;
+			$outText .=  $line;
 		}
 	}
-	close FH;
+
+	if($outText ne join('', @sourceLines)) {
+		open FH, '>' . $fileName or die "Can't write $fileName.\n";
+		print FH $outText;
+		close FH;
+	}
 }
